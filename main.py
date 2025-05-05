@@ -23,13 +23,14 @@ catch_sound = pygame.mixer.Sound("sound/catch.mp3")  # добавь свой cat
 
 # --- Переменные ---
 score = 0
+best_score = 0
 start_time = 0
 game_over = False
 ghost_rect = ghost_img.get_rect()
 ghost_visible = False
 ghost_timer = 0
 next_spawn_time = 0
-
+background = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 # --- Функции ---
 def spawn_ghost():
     x = random.randint(0, WIDTH - ghost_rect.width)
@@ -46,11 +47,12 @@ def draw_ui(time_left):
     screen.blit(tip_text, (WIDTH // 2 - tip_text.get_width() // 2, HEIGHT - 40))
 
 def reset_game():
-    global score, start_time, game_over, ghost_visible, next_spawn_time
+    global score, start_time, game_over, ghost_visible, background, next_spawn_time
     score = 0
     start_time = pygame.time.get_ticks()
     game_over = False
     ghost_visible = False
+    background = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
     next_spawn_time = start_time + random.randint(1000, 2000)
 
 # --- Старт игры ---
@@ -60,7 +62,7 @@ reset_game()
 while True:
     current_time = pygame.time.get_ticks()
     time_left = GAME_DURATION - (current_time - start_time)
-
+   
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
@@ -90,15 +92,19 @@ while True:
             game_over = True
 
     # Отрисовка
-    screen.fill((0, 0, 0))  # черный фон
+    screen.fill(background)  # черный фон
+
     if ghost_visible:
         screen.blit(ghost_img, ghost_rect)
 
     if game_over:
+        best_score = score if score > best_score else best_score
+        best_text = big_font.render(f"Лучший счет: {best_score}", True, (255, 0, 0))
         final_text = big_font.render(f"Время вышло! Ваш счёт: {score}", True, (255, 0, 0))
         restart_text = font.render("Нажмите ПРОБЕЛ, чтобы начать заново.", True, (255, 255, 255))
         screen.blit(final_text, (WIDTH // 2 - final_text.get_width() // 2, HEIGHT // 2 - 50))
         screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 20))
+        screen.blit(best_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 60))
     else:
         draw_ui(time_left)
 
