@@ -1,137 +1,106 @@
+import pygame #type: ignore
 import random
+import sys
 
-# Класс игрока
-class Player:
-    def __init__(self):
-        self.x = 0
-        self.y = 0
-        self.health = 100
+# --- Настройки ---
+WIDTH, HEIGHT = 800, 600
+FPS = 60
+GHOST_LIFETIME = 700  # мс
+GAME_DURATION = 30_000  # 30 секунд
 
-    def move(self, direction):
-        if direction == 'w':
-            self.x -= 1
-        elif direction == 's':
-            self.x += 1
-        elif direction == 'a':
-            self.y -= 1
-        elif direction == 'd':
-            self.y += 1
+# --- Инициализация ---
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Поймай Призрака!")
+clock = pygame.time.Clock()
+font = pygame.font.SysFont(None, 36)
+big_font = pygame.font.SysFont(None, 72)
 
-class Enemy:
-    def __init__(self):
-        self.x = random.randint(2,4)
-        self.y = random.randint(2,4)
+# --- Загрузка ресурсов ---
+ghost_img = pygame.image.load("img/ghost.webp")  # добавь свой ghost.png в ту же папку
+ghost_img = pygame.transform.scale(ghost_img, (100, 100))
+catch_sound = pygame.mixer.Sound("sound/catch.mp3")  # добавь свой catch.wav
 
-    def move(self, player):
-        # Двигается на один шаг ближе к игроку
-        if self.x < player.x:
-            self.x += 1
-        elif self.x > player.x:
-            self.x -= 1
-        elif self.y < player.y:
-            self.y += 1
-        elif self.y > player.y:
-            self.y -= 1
-        
-    
-# Функция генерации игрового поля
-def generate_field():
-    field = [['.' for _ in range(5)] for _ in range(5)]
+# --- Переменные ---
+score = 0
+start_time = 0
+game_over = False
+ghost_rect = ghost_img.get_rect()
+ghost_visible = False
+ghost_timer = 0
+next_spawn_time = 0
 
-    # Установка ловушек
-    traps = random.randint(3, 5)
-    placed = 0
-    while placed < traps:
-        x, y = random.randint(0, 4), random.randint(0, 4)
-        if (x, y) != (0, 0) and field[x][y] == '.':
-            field[x][y] = 'T'
-            placed += 1
+# --- Функции ---
+def spawn_ghost():
+    x = random.randint(0, WIDTH - ghost_rect.width)
+    y = random.randint(0, HEIGHT - ghost_rect.height)
+    ghost_rect.topleft = (x, y)
+    return pygame.time.get_ticks()
 
-    # Установка выхода
-    while True:
-        x, y = random.randint(0, 4), random.randint(0, 4)
-        if (x, y) != (0, 0) and field[x][y] == '.':
-            field[x][y] = 'X'
-            break
+def draw_ui(time_left):
+    score_text = font.render(f"Счёт: {score}", True, (255, 255, 255))
+    time_text = font.render(f"Время: {time_left // 1000}", True, (255, 255, 255))
+    tip_text = font.render("Кликай по призраку, пока не закончится время!", True, (200, 200, 200))
+    screen.blit(score_text, (10, 10))
+    screen.blit(time_text, (WIDTH - 150, 10))
+    screen.blit(tip_text, (WIDTH // 2 - tip_text.get_width() // 2, HEIGHT - 40))
 
-    return field
+def reset_game():
+    global score, start_time, game_over, ghost_visible, next_spawn_time
+    score = 0
+    start_time = pygame.time.get_ticks()
+    game_over = False
+    ghost_visible = False
+    next_spawn_time = start_time + random.randint(1000, 2000)
 
-# Функция отображения поля
-def print_field(field, player, enemy):
-    for i in range(5):
-        row = ''
-        for j in range(5):
-            if i == player.x and j == player.y:
-                row += 'P '
-            elif i == enemy.x and j == enemy.y:
-                row += 'E '
-            else:
-                row += field[i][j] + ' '
-        print(row)
-    print(f"Здоровье: {player.health}\n")
+# --- Старт игры ---
+reset_game()
 
-# Проверка границ
-def is_valid_move(x, y):
-    return 0 <= x < 5 and 0 <= y < 5
+# --- Главный цикл ---
+while True:
+    current_time = pygame.time.get_ticks()
+    time_left = GAME_DURATION - (current_time - start_time)
 
-# Основной игровой процесс
-def play_game():
-    field = generate_field()
-    player = Player()
-    enemy = Enemy()
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
 
-    while True:
-        print_field(field, player, enemy)
+        if event.type == pygame.MOUSEBUTTONDOWN and not game_over:
+            if ghost_visible and ghost_rect.collidepoint(event.pos):
+                score += 1
+                catch_sound.play()
+                ghost_visible = False  # убираем призрака после поимки
 
-        move = input("Введите направление (w/a/s/d): ").strip().lower()
-        if move not in ['w', 'a', 's', 'd']:
-            print("Недопустимое направление!\n")
-            continue
+        if event.type == pygame.KEYDOWN and game_over:
+            if event.key == pygame.K_SPACE:
+                reset_game()
 
-        # Проверка, не выйдет ли игрок за границы
-        new_x, new_y = player.x, player.y
-        if move == 'w':
-            new_x -= 1
-        elif move == 's':
-            new_x += 1
-        elif move == 'a':
-            new_y -= 1
-        elif move == 'd':
-            new_y += 1
+    # Обновление состояния
+    if not game_over:
+        if current_time >= next_spawn_time and not ghost_visible:
+            ghost_timer = spawn_ghost()
+            ghost_visible = True
 
-        if not is_valid_move(new_x, new_y):
-            print("Нельзя выйти за границы поля!\n")
-            continue
+        if ghost_visible and current_time - ghost_timer > GHOST_LIFETIME:
+            ghost_visible = False
+            next_spawn_time = current_time + random.randint(1000, 2000)
 
-        player.move(move)
-        current_cell = field[player.x][player.y]
-        enemy.move(player)
+        if time_left <= 0:
+            game_over = True
 
-        if current_cell == 'T':
-            print("Вы наступили на ловушку! -30 здоровья!\n")
-            player.health -= 30
-            field[player.x][player.y] = '.'
-        elif player.x == enemy.x and player.y == enemy.y:
-            print("Вы попались врагу! -100 здоровья!\n")
-            player.health -= 100
-        elif current_cell == 'X':
-            print("Вы нашли выход! Победа!\n")
-            break
+    # Отрисовка
+    screen.fill((0, 0, 0))  # черный фон
+    if ghost_visible:
+        screen.blit(ghost_img, ghost_rect)
 
-        if player.health <= 0:
-            print("Вы проиграли. Здоровье закончилось.\n")
-            break
+    if game_over:
+        final_text = big_font.render(f"Время вышло! Ваш счёт: {score}", True, (255, 0, 0))
+        restart_text = font.render("Нажмите ПРОБЕЛ, чтобы начать заново.", True, (255, 255, 255))
+        screen.blit(final_text, (WIDTH // 2 - final_text.get_width() // 2, HEIGHT // 2 - 50))
+        screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 20))
+    else:
+        draw_ui(time_left)
 
-# Повтор игры
-def main():
-    while True:
-        play_game()
-        again = input("Хотите сыграть снова? (y/n): ").strip().lower()
-        while again != 'y':
-            again = input("Хотите сыграть снова? (y/n): ").strip().lower()
-            if again == 'n':
-             print("Спасибо за игру!")
-             exit()
-
-if __name__ == "__main__":
-    main()
+    pygame.display.flip()
+    clock.tick(FPS)
