@@ -1,137 +1,133 @@
+import pygame # type: ignore
 import random
 
-# Класс игрока
-class Player:
-    def __init__(self):
-        self.x = 0
-        self.y = 0
-        self.health = 100
+pygame.init()
+WIDTH, HEIGHT = 800, 600 
+WIN = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Smart Parking")
 
-    def move(self, direction):
-        if direction == 'w':
-            self.x -= 1
-        elif direction == 's':
-            self.x += 1
-        elif direction == 'a':
-            self.y -= 1
-        elif direction == 'd':
-            self.y += 1
+FONT = pygame.font.SysFont("Arial", 20)
 
-class Enemy:
-    def __init__(self):
-        self.x = random.randint(2,4)
-        self.y = random.randint(2,4)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+GRAY = (200, 200, 200)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 
-    def move(self, player):
-        # Двигается на один шаг ближе к игроку
-        if self.x < player.x:
-            self.x += 1
-        elif self.x > player.x:
-            self.x -= 1
-        elif self.y < player.y:
-            self.y += 1
-        elif self.y > player.y:
-            self.y -= 1
-        
-    
-# Функция генерации игрового поля
-def generate_field():
-    field = [['.' for _ in range(5)] for _ in range(5)]
+SLOT_COUNT = 20
+SLOT_SIZE = 30
+SLOT_MARGIN = 5
+parking_slots = [None] * SLOT_COUNT
 
-    # Установка ловушек
-    traps = random.randint(3, 5)
-    placed = 0
-    while placed < traps:
-        x, y = random.randint(0, 4), random.randint(0, 4)
-        if (x, y) != (0, 0) and field[x][y] == '.':
-            field[x][y] = 'T'
-            placed += 1
+buttons = {
+    "in": pygame.Rect(600, 100, 180, 40),
+    "out": pygame.Rect(600, 160, 180, 40),
+}
 
-    # Установка выхода
-    while True:
-        x, y = random.randint(0, 4), random.randint(0, 4)
-        if (x, y) != (0, 0) and field[x][y] == '.':
-            field[x][y] = 'X'
-            break
+current_car = None
 
-    return field
+car_types = {
+    "легковая": {"size": 1, "color": (255,0,0)},
+    "грузовая": {"size": 2, "color": (0,0,255)},
+    "электромобиль": {"size": 1, "color": (0,255,0)},
+}
 
-# Функция отображения поля
-def print_field(field, player, enemy):
-    for i in range(5):
-        row = ''
-        for j in range(5):
-            if i == player.x and j == player.y:
-                row += 'P '
-            elif i == enemy.x and j == enemy.y:
-                row += 'E '
+
+def generate_car():
+    plate = f"{random.choice('QAZWXSECDRV')}{random.randint(100,999)}{random.choice("QAZWXSEDCRFV")}"
+    car_type = random.choice(list(car_types.keys()))
+    car = {
+        "plate": plate,
+        "type": car_type,
+        "size": car_types[car_type]["size"],
+        "color": car_types[car_type]["color"]
+    }
+    return car
+
+
+def draw_parking(surface, slots):
+    x, y = 20, 20
+    for i, slot in enumerate(slots):
+        rect = pygame.Rect(x, y, SLOT_SIZE, SLOT_SIZE)
+        color = RED if slot else GREEN
+        pygame.draw.rect(surface, color, rect)
+        x += SLOT_SIZE + SLOT_MARGIN
+
+        if (i + 1 ) % 10 == 0:
+            x = 20
+            y+= SLOT_SIZE + SLOT_MARGIN
+
+
+def park_car(car):
+    for i in range(SLOT_COUNT - car["size"] + 1 ):
+        if all(parking_slots[i + j] is None for j in range(car["size"])):  
+            for j in range(car["size"]):
+                parking_slots[i + j] = car
+            return True 
+    return False       
+
+
+def remove_random_car():
+    indices = [i for i, slot in enumerate(parking_slots) if slot is not None]
+    if not indices:
+        return "Парковка пуста"
+    index = random.choice(indices)
+    car = parking_slots[index]
+    for i in range(SLOT_COUNT):
+        if parking_slots[i] == car:
+            parking_slots[i] = None
+    return f"Машине {car["plate"]} Покинула парковку"   
+     
+
+def draw_ui():
+    pygame.draw.rect(WIN, GRAY, buttons["in"])
+    pygame.draw.rect(WIN, GRAY, buttons["out"])
+    WIN.blit(FONT.render("Впустить машину", True, BLACK), (610, 110))
+    WIN.blit(FONT.render("Выпустить машину", True, BLACK), (610, 170))
+
+    occupied = sum(1 for slot in parking_slots if slot)
+    WIN.blit(FONT.render(f"Занято: {occupied}", True, BLACK), (600, 250))
+    WIN.blit(FONT.render(f"Свободно: {SLOT_COUNT - occupied}", True, BLACK), (600, 280))
+
+    if current_car:
+        WIN.blit(FONT.render(f"Машина на въезде", True, BLACK), (600, 320))
+        WIN.blit(FONT.render(f"Номер: {current_car["plate"]}", True, BLACK), (600, 350))
+        WIN.blit(FONT.render(f"Тип: {current_car["type"]}", True, current_car['color']), (600, 380))
+
+
+def handler_click(pos):
+    global current_car
+    if buttons["in"].collidepoint(pos):
+        if not current_car:
+            current_car = generate_car()
+        else:
+            if park_car(current_car):
+                current_car = None
             else:
-                row += field[i][j] + ' '
-        print(row)
-    print(f"Здоровье: {player.health}\n")
+                print("нет мест")
+    elif buttons["out"].collidepoint(pos):
+        message = remove_random_car()
+        print(message)   
 
-# Проверка границ
-def is_valid_move(x, y):
-    return 0 <= x < 5 and 0 <= y < 5
-
-# Основной игровой процесс
-def play_game():
-    field = generate_field()
-    player = Player()
-    enemy = Enemy()
-
-    while True:
-        print_field(field, player, enemy)
-
-        move = input("Введите направление (w/a/s/d): ").strip().lower()
-        if move not in ['w', 'a', 's', 'd']:
-            print("Недопустимое направление!\n")
-            continue
-
-        # Проверка, не выйдет ли игрок за границы
-        new_x, new_y = player.x, player.y
-        if move == 'w':
-            new_x -= 1
-        elif move == 's':
-            new_x += 1
-        elif move == 'a':
-            new_y -= 1
-        elif move == 'd':
-            new_y += 1
-
-        if not is_valid_move(new_x, new_y):
-            print("Нельзя выйти за границы поля!\n")
-            continue
-
-        player.move(move)
-        current_cell = field[player.x][player.y]
-        enemy.move(player)
-
-        if current_cell == 'T':
-            print("Вы наступили на ловушку! -30 здоровья!\n")
-            player.health -= 30
-            field[player.x][player.y] = '.'
-        elif player.x == enemy.x and player.y == enemy.y:
-            print("Вы попались врагу! -100 здоровья!\n")
-            player.health -= 100
-        elif current_cell == 'X':
-            print("Вы нашли выход! Победа!\n")
-            break
-
-        if player.health <= 0:
-            print("Вы проиграли. Здоровье закончилось.\n")
-            break
-
-# Повтор игры
 def main():
-    while True:
-        play_game()
-        again = input("Хотите сыграть снова? (y/n): ").strip().lower()
-        while again != 'y':
-            again = input("Хотите сыграть снова? (y/n): ").strip().lower()
-            if again == 'n':
-             print("Спасибо за игру!")
-             exit()
+    global current_car
+    clock = pygame.time.Clock()
+    run = True
+    while run:
+        WIN.fill(WHITE)
+        draw_parking(WIN, parking_slots)
+        draw_ui()
+        pygame.display.update()
 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                handler_click(event.pos)
+
+        clock.tick(30)
+
+    pygame.quit()
+    
 if __name__ == "__main__":
-    main()
+    main()    
