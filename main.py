@@ -78,17 +78,25 @@ def update_cars():
             car[0] += dx
             car[1] += dy
         elif dy == 2:
-            if traffic_light_ns == "green" or y > 220:
-                car[1] += dy
+                if traffic_light_ns == "green":
+                    car[1] += dy
+                elif y > 220:
+                     car[1] += dy
         elif dy == -2:
-            if traffic_light_ns == "green" or  y < 580:
-                car[1] += dy
+                if traffic_light_ns == "green":
+                    car[1] += dy
+                elif y < 580:
+                     car[1] += dy
         elif dx == 2:
-            if traffic_light_ew == "green" or  x > 22:
-                car[0] += dx 
+                if traffic_light_ew == "green":
+                    car[0] += dx
+                elif x > 220:
+                     car[0] += dx
         elif dx == -2:
-            if traffic_light_ew == "green" or  x < 58:
-                car[0] += dx
+                if traffic_light_ew == "green":
+                    car[0] += dx
+                elif x < 580:
+                     car[0] += dx
 
     for car in cars[:]:
         if not (0 <= car[0] <= WIDTH and 0 <= car[1] <= HEIGHT):
@@ -122,6 +130,7 @@ def auto_switch():
         last_switch_time = pygame.time.get_ticks()
 
 
+
 def main():
     running = True
     global last_switch_time, auto_mode, cars
@@ -131,14 +140,16 @@ def main():
         draw_traffic_lights()
         draw_cars()
 
+
         if random.randint(0, 60) < 2:
             spawn_car()
 
         update_cars()
+
         mouse = pygame.mouse.get_pos()
         manual_btn = draw_buttons("Переключить вручную", 30, 700, 250, 50, pygame.Rect(50, 700, 250, 50).collidepoint(mouse))
         auto_btn = draw_buttons("Авто режим: " + ("ВКЛ" if auto_mode else "ВЫКЛ"), 525, 700, 250, 50, pygame.Rect(500, 700, 250, 50).collidepoint(mouse))
-        
+
         count_label = FONT.render(f"Проехало машин: {passed_cars}", True, NEON_BLUE)
         screen.blit(count_label, (WIDTH//2 - count_label.get_width()//2, 20))
 
